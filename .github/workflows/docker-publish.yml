@@ -28,15 +28,24 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Generate version tag
+        id: version
+        run: |
+          DATE=$(date +%Y%m%d)
+          HASH=$(git rev-parse --short HEAD)
+          COUNT=$(git rev-list --count --since="$(date +%Y-%m-%d) 00:00:00" HEAD)
+          VERSION="1.0.${DATE}-r${COUNT}-${HASH}"
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+
       - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=ref,event=branch
-            type=sha
             type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=1.0,enable={{is_default_branch}}
+            type=raw,value=${{ steps.version.outputs.version }},enable={{is_default_branch}}
 
       - name: Build and push
         uses: docker/build-push-action@v5
