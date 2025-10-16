@@ -9,12 +9,12 @@ get_endpoint_host() {
 
 resolve_ips() {
     local host="$1"
-    nslookup "$host" "$DNS_SERVER" 2>/dev/null | awk '/^Address: / && NR>2 {print $2}'
+    nslookup "$host" "$DNS_SERVER" 2>/dev/null | awk '/^Address:/ {if (NR>2) print $2}' | grep -E '^[0-9a-f:.]+$'
 }
 
-get_wg_endpoint() {
+get_wg_endpoint_ip() {
     local iface="$1"
-    wg show "$iface" dump 2>/dev/null | tail -n +2 | awk -F'\t' '{print $3}' | head -1
+    wg show "$iface" dump 2>/dev/null | tail -n +2 | awk -F'\t' '{print $3}' | head -1 | sed 's/^\[//;s/\]:[0-9]*$//;s/:[0-9]*$//'
 }
 
 get_wg_peer_pubkey() {
@@ -37,10 +37,8 @@ check_and_restart() {
     local resolved_ips=$(resolve_ips "$endpoint_host")
     [ -z "$resolved_ips" ] && return
     
-    local wg_endpoint=$(get_wg_endpoint "$iface")
-    [ -z "$wg_endpoint" ] && return
-    
-    local wg_ip=$(echo "$wg_endpoint" | cut -d':' -f1)
+    local wg_ip=$(get_wg_endpoint_ip "$iface")
+    [ -z "$wg_ip" ] && return
     
     local match=0
     for ip in $resolved_ips; do
@@ -51,15 +49,20 @@ check_and_restart() {
     done
     
     if [ $match -eq 0 ]; then
-        # Prefer IPv6 if available, fallback to IPv4
         local new_ip=$(echo "$resolved_ips" | grep ':' | head -1)
         [ -z "$new_ip" ] && new_ip=$(echo "$resolved_ips" | head -1)
         
         local port=$(get_endpoint_port "$conf")
         local peer=$(get_wg_peer_pubkey "$iface")
+        local new_endpoint="$new_ip:$port"
         
-        echo "$(date): $iface endpoint $endpoint_host IP mismatch. WG: $wg_ip, DNS: $resolved_ips. Updating to $new_ip:$port"
-        wg set "$iface" peer "$peer" endpoint "[$new_ip]:$port"
+        # Wrap IPv6 in brackets
+        if echo "$new_ip" | grep -q ':'; then
+            new_endpoint="[$new_ip]:$port"
+        fi
+        
+        echo "$(date): $iface endpoint $endpoint_host IP mismatch. WG: $wg_ip, DNS: $resolved_ips. Updating to $new_endpoint"
+        wg set "$iface" peer "$peer" endpoint "$new_endpoint"
     fi
 }
 
