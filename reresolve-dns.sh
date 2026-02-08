@@ -17,7 +17,8 @@ process_peer() {
 	[[ $PEER_SECTION -ne 1 || -z $PUBLIC_KEY || -z $ENDPOINT ]] && return 0
 	[[ $(wg show "$INTERFACE" latest-handshakes) =~ ${PUBLIC_KEY//+/\\+}\	([0-9]+) ]] || return 0
 	(( ($EPOCHSECONDS - ${BASH_REMATCH[1]}) > 135 )) || return 0
-	wg set "$INTERFACE" peer "$PUBLIC_KEY" endpoint "$ENDPOINT"
+	#wg set "$INTERFACE" peer "$PUBLIC_KEY" endpoint "$ENDPOINT"
+	wg-quick down $CONFIG_FILE && wg-quick up $CONFIG_FILE
 	reset_peer_section
 }
 
