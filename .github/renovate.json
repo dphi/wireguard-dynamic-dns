@@ -4,11 +4,14 @@
     "config:recommended"
   ],
   "docker": {
-    "enabled": true
+    "enabled": true,
+    "pinDigests": true
   },
   "packageRules": [
     {
-      "matchDatasources": ["docker"],
+      "matchDatasources": [
+        "docker"
+      ],
       "automerge": false
     }
   ]
